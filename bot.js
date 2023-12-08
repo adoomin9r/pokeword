@@ -129,14 +129,6 @@ client.on("ready", async () => {
       name: 'exitgame',
       description: 'Quits a PokeWord match in the current channel (if running).',
     },
-    {
-      name: 'genadd',
-      description: 'Adds generations of pokemon to the PokeWord name pool.'
-    },
-    {
-      name: 'gendel',
-      description: 'Removes generations of pokemon from the PokeWord name pool.'
-    }
   ];
 
   const commandList = await client.guilds.cache
@@ -268,7 +260,6 @@ const enable_gen = number => {
   }
 }
 const addGens = async (message, arg) => {
-  const channel_id = message.channel.id;
   if(ACTIVE_GAME_CHANNELS.length > 0) {
     await message.react("🚫");
     return;
@@ -305,7 +296,6 @@ const disable_gen = number => {
   }
 }
 const delGens = async (message, arg) => {
-  const channel_id = message.channel.id;
   if(ACTIVE_GAME_CHANNELS.length > 0) {
     await message.react("🚫");
     return;
@@ -337,7 +327,17 @@ const delGens = async (message, arg) => {
 const showGens = async (channel_id) => {
   const channel = client.channels.cache.get(channel_id);
   let local_gens = gens.filter(item => item.toggle).map(item => item.name).join(', ')
-  channel.send(`Enabled gens: ${local_gens}`);
+  channel.send(`Enabled gens: ${local_gens}. Difficulty: **${DIFFICULTY * 100}%**`);
+}
+
+const adjustDifficulty = async (message, arg) => {
+  const val = parseInt(arg)
+  if(!isNaN(val) && val >= 25 && val <= 100 && ACTIVE_GAME_CHANNELS.length == 0) {
+    DIFFICULTY = val / 100;
+    await message.react("💯");
+  } else {
+    await message.react("🚫");
+  }
 }
 
 client.on('interactionCreate', async (interaction) => {
@@ -410,6 +410,9 @@ client.on("messageCreate", msg => {
     }
     else if (msg.content ===("$showgens")) {
       showGens(msg.channelId)
+    }
+    else if (msg.content.startsWith("$difficulty ")) {
+      adjustDifficulty(msg, msg.content.split(' ')[1])
     }
   }
 
