@@ -194,7 +194,7 @@ const createTurnTimer = async (channel_id) => {
   //     break;
   //   }
   // }
-  var target = usable_substrings[Math.random() * DIFFICULTY * usable_substrings.length].name;
+  var target = usable_substrings[Math.floor(parseInt(Math.random() * DIFFICULTY * usable_substrings.length))].name;
   let game = ACTIVE_GAME_CHANNELS.get(channel_id)
   if(game === null) {
     return;
