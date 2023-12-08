@@ -101,6 +101,7 @@ const client = new Discord.Client({ intents: [
 
 client.on("ready", async () => {
   console.log(`Logged in as ${client.user.tag}!`)
+  client.user.setActivity(`dead`);
   //increase this list for more commands
   const commands = [
     {
