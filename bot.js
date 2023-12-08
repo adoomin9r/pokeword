@@ -2,6 +2,51 @@ const Discord = require("discord.js");
 require('dotenv').config();
 const fs = require("fs");
 
+const gens = [
+  {id: 1, name: "Kanto", toggle: 1, start: 1.0}, 
+  {id: 2, name: "Johto", toggle: 1, start: 152.0}, 
+  {id: 3, name: "Hoenn", toggle: 1, start: 252.0}, 
+  {id: 4, name: "Sinnoh", toggle: 1, start: 387.0}, 
+  {id: 5, name: "Unova", toggle: 1, start: 494.0}, 
+  {id: 6, name: "Kalos", toggle: 1, start: 650.0}, 
+  {id: 7, name: "Alola", toggle: 1, start: 722.0}, 
+  {id: 8, name: "Galar", toggle: 1, start: 810.0}, 
+  {id: 9, name: "Paldea", toggle: 1, start: 906.0}];
+//https://www.w3resource.com/javascript-exercises/searching-and-sorting-algorithm/searching-and-sorting-algorithm-exercise-27.php
+// const findGen = (count, start, end) => {
+//   if (start === end) {
+//     if (gens[start].start > count) {
+//       return start
+//     } else {
+//       return start + 1
+//     }
+//   }
+
+//   if (start > end) {
+//     return start
+//   }
+
+//   const mid = Math.floor(parseInt((start + end) / 2))
+
+//   if (gens[mid].start < count) {
+//     return findGen(count, mid + 1, end)
+//   } else if (gens[mid].start > count) {
+//     return findGen(count, start, mid - 1)
+//   } else {
+//     return mid
+//   }
+// }
+
+const findGenLinear = count => {
+  let i;
+  for(i = 0; i < gens.length; i++) {
+    if(count < gens[i].start) {
+      return i;
+    }
+  }
+  return i;
+}
+
 //chatgpt moment
 function parseCSVSync(filePath) {
   try {
@@ -16,7 +61,9 @@ function parseCSVSync(filePath) {
       .forEach((row) => {
         // Split each row by comma (or another delimiter)
         const columns = row.split(',');
-        results.push(columns[1].split(' ').filter(item => !(item.includes('(') || item.includes(')'))).join(' '));
+        const name = columns[1].split(' ').filter(item => !(item.includes('(') || item.includes(')'))).join(' ');
+        if (results.filter(item => item.name === name).length === 0)
+        results.push({name: name, gen: findGenLinear(Math.floor(parseInt(columns[0])))});
       });
 
     return results;
@@ -27,17 +74,14 @@ function parseCSVSync(filePath) {
 }
 
 // Usage
-const filePath = 'pokedex.csv';
+const filePath = `${process.cwd()}/pokedex.csv`;
 const parsedData = parseCSVSync(filePath);
-const ACCEPTED_WORDS = [...new Set(parsedData)]
- 
+let ACCEPTED_WORDS = parsedData;
 
-const SERVER_ID=process.env.SERVER_ID
+const SERVER_ID=process.env.SERVER_ID_L
 const BOT_ID=process.env.BOT_ID
 
-const timeout = 20000;
-const vowels = "AEIOU"
-
+const timeout = 15000;
 let START_HP = 5;
 let TURN_LENGTH = 25000;
 const ACTIVE_GAME_CHANNELS = new Map();
@@ -70,12 +114,26 @@ client.on("ready", async () => {
     {
       name: 'exitgame',
       description: 'Quits a PokeWord match in the current channel (if running).',
+    },
+    {
+      name: 'genadd',
+      description: 'Adds generations of pokemon to the PokeWord name pool.'
+    },
+    {
+      name: 'gendel',
+      description: 'Removes generations of pokemon from the PokeWord name pool.'
     }
   ];
 
   const commandList = await client.guilds.cache
     .get(SERVER_ID)
     ?.commands.set(commands);
+  const commandList2 = await client.guilds.cache
+  .get(process.env.SERVER_ID)
+  ?.commands.set(commands);
+  const commandList3 = await client.guilds.cache
+  .get(process.env.SERVER_ID_M)
+  ?.commands.set(commands);
   //console.log(commandList);
 })
 
@@ -98,7 +156,7 @@ const buildPlayerList = async (message) => {
       playGame(message.channel.id, player_list);
   } else {
     const channel = client.channels.cache.get(message.channel.id);
-    channel.send('Nobody joined, cancelling :(');
+    channel.send('😴 Nobody joined, cancelling...');
   }
 }
 
@@ -114,7 +172,7 @@ const createTurnTimer = async (channel_id) => {
   // var target = alphanum.substring(rand, rand+1);
   var target = "";
   while(true) {
-    var pokemon = ACCEPTED_WORDS[Math.floor(Math.random() * ACCEPTED_WORDS.length)]
+    var pokemon = ACCEPTED_WORDS[Math.floor(Math.random() * ACCEPTED_WORDS.length)].name
     var substring_idx = Math.floor(Math.random() * (pokemon.length - 2))
     var substring = pokemon.substring(substring_idx, substring_idx + 3)
     if (substring.match(/[aeiou]/gi) !== null && substring.match(/[aeiou]/gi).length > 0 && !substring.includes(' ') &&!substring.includes('-')) {
@@ -127,7 +185,7 @@ const createTurnTimer = async (channel_id) => {
     return;
   }
   const lose_condition = game.player_list.length > 1
-  const target_message = await channel.send(`<@${game.player_list[game.cur_player_turn].id}>, type a word containing '${target}'`);
+  const target_message = await channel.send(`<@${game.player_list[game.cur_player_turn].id}>, name a Pokemon containing '${target}'`);
   //console.log(target_message);
   const timer = setTimeout(() => {
     channel.send(`😓 Failed! -1 HP. total: ${game.player_list[game.cur_player_turn].hp - 1}`)
@@ -186,6 +244,87 @@ const quitGame = async (interaction, channel_id) => {
   }
 }
 
+const enable_gen = number => {
+  if(gens[parseInt(number) - 1].toggle == 0) {
+    parsedData.filter(item => item.gen == number).forEach(item => {
+      ACCEPTED_WORDS.push(item);
+    })
+    gens[parseInt(number) - 1].toggle = 1;
+  }
+}
+const addGens = async (message, arg) => {
+  const channel_id = message.channel.id;
+  if(ACTIVE_GAME_CHANNELS.length > 0) {
+    await message.react("🚫");
+    return;
+  } else {
+    if(/^\d+$/.test(arg)) {
+      enable_gen(arg)
+    } else if(arg === "*") {
+      for(var i = 1; i <= gens.length; i++) {
+        enable_gen(i);
+      }
+    } else if(arg.match(/^\*\d+$/)) {
+      for(var i = 1; i <= parseInt(arg.substring(1, arg.length)); i++) {
+        enable_gen(i);
+      }
+    } else if(arg.match(/^\d+\*$/)) {
+      for(var i = parseInt(arg.substring(0, arg.length - 1)); i <= gens.length; i++) {
+        enable_gen(i);
+      }
+    } else {
+      await message.react("🚫");
+      return;
+    }
+    
+  }
+  await message.react("💯");
+  return;
+}
+const disable_gen = number => {
+  if(gens[parseInt(number) - 1].toggle == 1) {
+    ACCEPTED_WORDS = ACCEPTED_WORDS.filter(item => 
+      item.gen != number
+    )
+    gens[parseInt(number) - 1].toggle = 0;
+  }
+}
+const delGens = async (message, arg) => {
+  const channel_id = message.channel.id;
+  if(ACTIVE_GAME_CHANNELS.length > 0) {
+    await message.react("🚫");
+    return;
+  } else {
+    if(/^[1-9]$/.test(arg)) {
+      disable_gen(arg)
+    } else if(arg.match(/^\*[1-9]$/)) {
+      for(var i = 1; i <= parseInt(arg.substring(1, arg.length)); i++) {
+        disable_gen(i);
+      }
+    } else if(arg === "*") {
+      for(var i = 1; i <= gens.length; i++) {
+        disable_gen(i);
+      }
+    } else if(arg.match(/^[1-9]\*$/)) {
+      for(var i = parseInt(arg.substring(0, arg.length - 1)); i <= gens.length; i++) {
+        disable_gen(i);
+      }
+      console.log(ACCEPTED_WORDS.length)
+    } else {
+      await message.react("🚫");
+      return;
+    }
+    
+  }
+  await message.react("💯");
+  return;
+}
+
+const showGens = async (channel_id) => {
+  const channel = client.channels.cache.get(channel_id);
+  let local_gens = gens.filter(item => item.toggle).map(item => item.name).join(', ')
+  channel.send(`Enabled gens: ${local_gens}`);
+}
 
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isCommand()) return;
@@ -196,7 +335,11 @@ client.on('interactionCreate', async (interaction) => {
       await interaction.reply('Helo c:');
     } else if(commandName === 'exitgame') {
       await quitGame(interaction, interaction.channelId);
-    }else if (commandName === 'play') {
+    } else if (commandName === 'play') {
+      if(ACCEPTED_WORDS.length === 0) {
+        interaction.reply("⚠️ You don't have any generations enabled :( turn some on with $genadd <number> to play!");
+        return;
+      }
       interaction.reply("⚔️ Starting, react to play!! ⚔️");
       let message = await interaction.fetchReply()
       let running = ACTIVE_GAME_CHANNELS.has(message.channel.id)
@@ -228,7 +371,7 @@ client.on("messageCreate", msg => {
   let game = ACTIVE_GAME_CHANNELS.get(msg.channelId);
   let game_timer = ACTIVE_GAME_TIMERS.get(msg.channelId);
   if(typeof game !== 'undefined' && typeof game_timer !== 'undefined') {
-    if(msg.author.id === game.player_list[game.cur_player_turn].id && msg.content.toUpperCase().includes(game_timer.target) && ACCEPTED_WORDS.map(item => item.toLowerCase()).includes(msg.content.toLowerCase())) {
+    if(msg.author.id === game.player_list[game.cur_player_turn].id && msg.content.toUpperCase().includes(game_timer.target) && ACCEPTED_WORDS.map(item => item.name.toLowerCase()).includes(msg.content.toLowerCase())) {
       const channel = client.channels.cache.get(msg.channel.id);
       var rand = Math.floor(Math.random() * 30)
       channel.send(rand === 0 ? 'Pikapika!' : rand < 20 ? 'Nice!' : 'Great!');
@@ -243,9 +386,17 @@ client.on("messageCreate", msg => {
       ACTIVE_GAME_TIMERS.delete(msg.channelId);
       createTurnTimer(msg.channelId);
     }
+  } else {
+    if(msg.content.startsWith("$genadd ")) {
+      addGens(msg, msg.content.split(' ')[1])
+    } else if (msg.content.startsWith("$gendel ")) {
+      delGens(msg, msg.content.split(' ')[1])
+    }
+    else if (msg.content ===("$showgens")) {
+      showGens(msg.channelId)
+    }
   }
 
 })
 
 client.login(process.env.TOKEN)
-//client.login(TOKEN)
