@@ -12,30 +12,6 @@ const gens = [
   {id: 7, name: "Alola", toggle: 1, start: 722.0}, 
   {id: 8, name: "Galar", toggle: 1, start: 810.0}, 
   {id: 9, name: "Paldea", toggle: 1, start: 906.0}];
-//https://www.w3resource.com/javascript-exercises/searching-and-sorting-algorithm/searching-and-sorting-algorithm-exercise-27.php
-// const findGen = (count, start, end) => {
-//   if (start === end) {
-//     if (gens[start].start > count) {
-//       return start
-//     } else {
-//       return start + 1
-//     }
-//   }
-
-//   if (start > end) {
-//     return start
-//   }
-
-//   const mid = Math.floor(parseInt((start + end) / 2))
-
-//   if (gens[mid].start < count) {
-//     return findGen(count, mid + 1, end)
-//   } else if (gens[mid].start > count) {
-//     return findGen(count, start, mid - 1)
-//   } else {
-//     return mid
-//   }
-// }
 
 const findGenLinear = count => {
   let i;
@@ -82,10 +58,47 @@ const SERVER_ID=process.env.SERVER_ID_L
 const BOT_ID=process.env.BOT_ID
 
 const timeout = 15000;
+const SUBSTRING_LENGTH = 3;
 let START_HP = 5;
 let TURN_LENGTH = 25000;
+let DIFFICULTY = 0.5;
 const ACTIVE_GAME_CHANNELS = new Map();
 const ACTIVE_GAME_TIMERS = new Map();
+
+const SUBSTRINGS = {};
+
+const populateSubstrings = (substring_length) => {
+  //parseddata entries are {name, gen}
+  parsedData.forEach(entry => {
+    for (let j = 0; j < entry.name.length - substring_length + 1; j++) {
+      const substring = entry.name.slice(j, j+substring_length).toUpperCase();
+      if(!SUBSTRINGS[substring]) {
+        let newArr = Array(gens.length).fill(0);
+        newArr[entry.gen - 1] = 1;
+        SUBSTRINGS[substring] = newArr;
+      } else {
+        SUBSTRINGS[substring][entry.gen - 1] += 1;
+      }
+    }
+  })
+}
+
+const refreshUsableSubstrings = (all) => {
+  let usable_substrings = Object.entries(all).map(item => {
+    let sum = 0;
+    for(let i = 0; i < item[1].length; i++) {
+      if(gens[i].toggle == 1) {
+        sum += item[1][i];
+      }
+    };
+    return{name: item[0], count: sum}
+  }).filter(item => item.count > 0);
+  usable_substrings.sort((s1, s2) => s2.count - s1.count);
+  return usable_substrings;
+}
+
+populateSubstrings(SUBSTRING_LENGTH);
+let usable_substrings = refreshUsableSubstrings(SUBSTRINGS);
 //key: channel id, value : 
 // {
 //   cur_player_turn: id,
@@ -171,16 +184,17 @@ const createTurnTimer = async (channel_id) => {
   const channel = client.channels.cache.get(channel_id);
   // var rand = Math.floor(Math.random() * 26)
   // var target = alphanum.substring(rand, rand+1);
-  var target = "";
-  while(true) {
-    var pokemon = ACCEPTED_WORDS[Math.floor(Math.random() * ACCEPTED_WORDS.length)].name
-    var substring_idx = Math.floor(Math.random() * (pokemon.length - 2))
-    var substring = pokemon.substring(substring_idx, substring_idx + 3)
-    if (substring.match(/[aeiou]/gi) !== null && substring.match(/[aeiou]/gi).length > 0 && !substring.includes(' ') &&!substring.includes('-')) {
-      target = substring.toUpperCase();
-      break;
-    }
-  }
+  // var target = "";
+  // while(true) {
+  //   var pokemon = ACCEPTED_WORDS[Math.floor(Math.random() * ACCEPTED_WORDS.length)].name
+  //   var substring_idx = Math.floor(Math.random() * (pokemon.length - 2))
+  //   var substring = pokemon.substring(substring_idx, substring_idx + 3)
+  //   if (substring.match(/[aeiou]/gi) !== null && substring.match(/[aeiou]/gi).length > 0 && !substring.includes(' ') &&!substring.includes('-')) {
+  //     target = substring.toUpperCase();
+  //     break;
+  //   }
+  // }
+  var target = usable_substrings[Math.random() * DIFFICULTY * usable_substrings.length].name;
   let game = ACTIVE_GAME_CHANNELS.get(channel_id)
   if(game === null) {
     return;
@@ -310,7 +324,6 @@ const delGens = async (message, arg) => {
       for(var i = parseInt(arg.substring(0, arg.length - 1)); i <= gens.length; i++) {
         disable_gen(i);
       }
-      console.log(ACCEPTED_WORDS.length)
     } else {
       await message.react("🚫");
       return;
@@ -390,8 +403,10 @@ client.on("messageCreate", msg => {
   } else {
     if(msg.content.startsWith("$genadd ")) {
       addGens(msg, msg.content.split(' ')[1])
+      usable_substrings = refreshUsableSubstrings(SUBSTRINGS);
     } else if (msg.content.startsWith("$gendel ")) {
       delGens(msg, msg.content.split(' ')[1])
+      usable_substrings = refreshUsableSubstrings(SUBSTRINGS);
     }
     else if (msg.content ===("$showgens")) {
       showGens(msg.channelId)
