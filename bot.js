@@ -332,7 +332,11 @@ const showGens = async (channel_id) => {
 
 const adjustDifficulty = async (message, arg) => {
   const val = parseInt(arg)
-  if(!isNaN(val) && val >= 25 && val <= 100 && ACTIVE_GAME_CHANNELS.length == 0) {
+  if(ACTIVE_GAME_CHANNELS.length > 0) {
+    await message.react("🚫");
+    return;
+  } 
+  if(!isNaN(val) && val >= 25 && val <= 100) {
     DIFFICULTY = val / 100;
     await message.react("💯");
   } else {
