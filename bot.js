@@ -168,7 +168,7 @@ const buildPlayerList = async (message) => {
 
 const playGame = (channel_id, player_list) => {
   const lose_condition = player_list.length > 1;
-  ACTIVE_GAME_CHANNELS.set(channel_id, {lose_condition: lose_condition, cur_player_turn: 0, player_list: player_list});
+  ACTIVE_GAME_CHANNELS.set(channel_id, {lose_condition: lose_condition, cur_player_turn: 0, player_list: player_list, used: {}, usable_for_game: [...usable_substrings]});
   createTurnTimer(channel_id);
 }
 
@@ -186,11 +186,34 @@ const createTurnTimer = async (channel_id) => {
   //     break;
   //   }
   // }
-  var target = usable_substrings[Math.floor(parseInt(Math.random() * DIFFICULTY * usable_substrings.length))].name;
   let game = ACTIVE_GAME_CHANNELS.get(channel_id)
   if(game === null) {
     return;
   }
+  let random_idx = Math.floor(parseInt(Math.random() * DIFFICULTY * game.usable_for_game.length));
+  let usable_substring = game.usable_for_game[random_idx];
+  let target = usable_substring.name;
+  while(game.used[target] == game.usable_for_game[random_idx].count) {
+    game.usable_for_game.splice(random_idx, 1);
+    if(game.usable_for_game.length == 0) {
+      channel.send('🎺 All possible mons guessed, game end!');
+      game.player_list.sort((a, b) => a.hp > b.hp)
+      channel.send(`👑 <@${game.player_list[0].id}> wins! :D`);
+      ACTIVE_GAME_CHANNELS.delete(channel_id);
+      let game_timer = ACTIVE_GAME_TIMERS.get(channel_id);
+      if(game_timer) {
+        clearTimeout(game_timer.timer);
+        clearCounters(game_timer.counters);
+      }
+      ACTIVE_GAME_TIMERS.delete(channel_id);
+      return null;
+    }
+    random_idx = Math.floor(parseInt(Math.random() * DIFFICULTY * usable_for_game.length));
+    usable_substring = usable_for_game[random_idx];
+    target = usable_substring.name;
+  }
+
+  
   const lose_condition = game.player_list.length > 1
   const target_message = await channel.send(`<@${game.player_list[game.cur_player_turn].id}>, name a Pokemon containing '${target}'`);
   //console.log(target_message);
@@ -397,6 +420,11 @@ client.on("messageCreate", msg => {
       game.cur_player_turn++;
       if(game.cur_player_turn >= game.player_list.length) {
         game.cur_player_turn = 0;
+      }
+      if(!game.used[game_timer.target]) {
+        game.used[game_timer.target] = 1;
+      } else {
+        game.used[game_timer.target] += 1;
       }
       ACTIVE_GAME_CHANNELS.set(msg.channelId, game);
       clearTimeout(game_timer.timer);
