@@ -168,7 +168,7 @@ const buildPlayerList = async (message) => {
 
 const playGame = (channel_id, player_list) => {
   const lose_condition = player_list.length > 1;
-  ACTIVE_GAME_CHANNELS.set(channel_id, {lose_condition: lose_condition, cur_player_turn: 0, player_list: player_list, used: {}, usable_for_game: [...usable_substrings]});
+  ACTIVE_GAME_CHANNELS.set(channel_id, {lose_condition: lose_condition, cur_player_turn: 0, player_list: player_list, used: {}, usable_for_game: [...usable_substrings], used_names: []});
   createTurnTimer(channel_id);
 }
 
@@ -412,7 +412,7 @@ client.on("messageCreate", msg => {
   let game = ACTIVE_GAME_CHANNELS.get(msg.channelId);
   let game_timer = ACTIVE_GAME_TIMERS.get(msg.channelId);
   if(typeof game !== 'undefined' && typeof game_timer !== 'undefined') {
-    if(msg.author.id === game.player_list[game.cur_player_turn].id && msg.content.toUpperCase().includes(game_timer.target) && ACCEPTED_WORDS.map(item => item.name.toLowerCase()).includes(msg.content.toLowerCase())) {
+    if(!game.used_names.includes(msg.content.toUpperCase()) && msg.author.id === game.player_list[game.cur_player_turn].id && msg.content.toUpperCase().includes(game_timer.target) && ACCEPTED_WORDS.map(item => item.name.toLowerCase()).includes(msg.content.toLowerCase())) {
       const channel = client.channels.cache.get(msg.channel.id);
       var rand = Math.floor(Math.random() * 30)
       channel.send(rand === 0 ? 'Pikapika!' : rand < 20 ? 'Nice!' : 'Great!');
@@ -421,6 +421,7 @@ client.on("messageCreate", msg => {
       if(game.cur_player_turn >= game.player_list.length) {
         game.cur_player_turn = 0;
       }
+      game.used_names.push(msg.content.toUpperCase())
       if(!game.used[game_timer.target]) {
         game.used[game_timer.target] = 1;
       } else {
