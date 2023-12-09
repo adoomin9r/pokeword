@@ -2,6 +2,7 @@ const Discord = require("discord.js");
 require('dotenv').config();
 const fs = require("fs");
 
+const hellos = ["Helo c:", "Hi!! :D", "Howdy B)", "heyo~", "what's good gamer 😈", "Hello. 🫡", "eyyyy 👉😎👉", "well hello there ( ͡° ͜ʖ ͡° )", "(✿◠‿◠) hi~"];
 const gens = [
   {id: 1, name: "Kanto", toggle: 1, start: 1.0}, 
   {id: 2, name: "Johto", toggle: 1, start: 152.0}, 
@@ -373,7 +374,7 @@ client.on('interactionCreate', async (interaction) => {
     const { commandName } = interaction;
   
     if (commandName === 'hello') {
-      await interaction.reply('Helo c:');
+      await interaction.reply(hellos[Math.floor(parseInt(Math.random() * hellos.length))]);
     } else if(commandName === 'exitgame') {
       await quitGame(interaction, interaction.channelId);
     } else if (commandName === 'play') {
